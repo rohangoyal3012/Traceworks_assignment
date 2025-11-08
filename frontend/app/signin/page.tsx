@@ -44,10 +44,18 @@ export default function SignIn() {
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError("");
+              }}
+              onFocus={() => setError("")}
               required
-              style={styles.input}
+              style={{
+                ...styles.input,
+                borderColor: error && !email ? "#e74c3c" : "#e0e0e0",
+              }}
               placeholder="your@email.com"
+              disabled={loading}
             />
           </div>
           <div style={styles.inputGroup}>
@@ -55,14 +63,40 @@ export default function SignIn() {
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError("");
+              }}
+              onFocus={() => setError("")}
               required
-              style={styles.input}
+              style={{
+                ...styles.input,
+                borderColor: error && !password ? "#e74c3c" : "#e0e0e0",
+              }}
               placeholder="••••••••"
+              disabled={loading}
             />
           </div>
           {error && <p style={styles.error}>{error}</p>}
-          <button type="submit" disabled={loading} style={styles.button}>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              ...styles.button,
+              opacity: loading ? 0.7 : 1,
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.background = "#5568d3";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!loading) {
+                e.currentTarget.style.background = "#667eea";
+              }
+            }}
+          >
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
@@ -120,8 +154,10 @@ const styles: { [key: string]: React.CSSProperties } = {
     border: "2px solid #e0e0e0",
     borderRadius: "8px",
     fontSize: "16px",
-    transition: "border-color 0.3s",
+    transition: "all 0.3s",
     outline: "none",
+    width: "100%",
+    boxSizing: "border-box",
   },
   error: {
     color: "#e74c3c",
@@ -137,7 +173,9 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: "16px",
     fontWeight: "600",
     cursor: "pointer",
-    transition: "background 0.3s",
+    transition: "all 0.3s",
+    width: "100%",
+    opacity: 1,
   },
   footer: {
     marginTop: "24px",

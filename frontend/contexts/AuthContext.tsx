@@ -32,9 +32,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const checkAuth = async () => {
-    const validatedUser = await AuthService.validateToken();
-    setUser(validatedUser);
-    setLoading(false);
+    try {
+      const validatedUser = await AuthService.validateToken();
+      setUser(validatedUser);
+    } catch (error) {
+      // Try to refresh token if validation fails
+      try {
+        await AuthService.refreshToken();
+        const validatedUser = await AuthService.validateToken();
+        setUser(validatedUser);
+      } catch (refreshError) {
+        setUser(null);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signin = async (email: string, password: string) => {

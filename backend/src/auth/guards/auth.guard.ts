@@ -12,13 +12,21 @@ export class AuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw new UnauthorizedException("No token provided");
+    // Try to get token from cookie first (preferred)
+    let token = request.cookies?.access_token;
+
+    // Fallback to Authorization header
+    if (!token) {
+      const authHeader = request.headers.authorization;
+      if (authHeader && authHeader.startsWith("Bearer ")) {
+        token = authHeader.substring(7);
+      }
     }
 
-    const token = authHeader.substring(7);
+    if (!token) {
+      throw new UnauthorizedException("No token provided");
+    }
 
     try {
       const user = await this.authService.validateToken(token);

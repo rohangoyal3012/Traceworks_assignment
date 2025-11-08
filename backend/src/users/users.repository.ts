@@ -39,3 +39,53 @@ export class UsersRepository {
     );
   }
 }
+
+export interface RefreshToken {
+  id: number;
+  user_id: number;
+  token: string;
+  expires_at: Date;
+  created_at: Date;
+}
+
+@Injectable()
+export class RefreshTokensRepository {
+  constructor(private readonly db: DatabaseService) {}
+
+  async create(
+    userId: number,
+    token: string,
+    expiresAt: Date
+  ): Promise<RefreshToken> {
+    const result = await this.db.query(
+      "INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING *",
+      [userId, token, expiresAt]
+    );
+    return result.rows[0];
+  }
+
+  async findByToken(token: string): Promise<RefreshToken | null> {
+    const result = await this.db.query(
+      "SELECT * FROM refresh_tokens WHERE token = $1 AND expires_at > NOW()",
+      [token]
+    );
+    return result.rows[0] || null;
+  }
+
+  async deleteByToken(token: string): Promise<void> {
+    await this.db.query("DELETE FROM refresh_tokens WHERE token = $1", [token]);
+  }
+
+  async deleteByUserId(userId: number): Promise<void> {
+    await this.db.query("DELETE FROM refresh_tokens WHERE user_id = $1", [
+      userId,
+    ]);
+  }
+
+  async deleteExpired(): Promise<void> {
+    await this.db.query(
+      "DELETE FROM refresh_tokens WHERE expires_at < NOW()",
+      []
+    );
+  }
+}

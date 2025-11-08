@@ -26,8 +26,23 @@ export class ApiClient {
     try {
       const response = await fetch(`${API_URL}${endpoint}`, {
         ...options,
+        credentials: "include", // Include cookies
         headers: this.getHeaders(token),
       });
+
+      // Handle 401 - try to refresh token
+      if (
+        response.status === 401 &&
+        endpoint !== "/auth/refresh" &&
+        endpoint !== "/auth/signin" &&
+        endpoint !== "/auth/signup"
+      ) {
+        const refreshResponse = await this.post("/auth/refresh", {});
+        if (refreshResponse.data) {
+          // Retry original request
+          return this.request<T>(endpoint, options, token);
+        }
+      }
 
       const data = await response.json();
 

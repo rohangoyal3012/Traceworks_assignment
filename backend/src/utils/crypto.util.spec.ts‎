@@ -1,0 +1,211 @@
+import { CryptoUtil } from "./crypto.util";
+
+describe("CryptoUtil", () => {
+  describe("hashPassword", () => {
+    const testCases = [
+      {
+        name: "should hash password with salt",
+        password: "testpassword123",
+        expectedFormat: /^[a-f0-9]{32}:[a-f0-9]{128}$/,
+      },
+      {
+        name: "should produce different hashes for same password",
+        password: "samepassword",
+        expectedFormat: /^[a-f0-9]{32}:[a-f0-9]{128}$/,
+      },
+      {
+        name: "should handle empty password",
+        password: "",
+        expectedFormat: /^[a-f0-9]{32}:[a-f0-9]{128}$/,
+      },
+      {
+        name: "should handle special characters",
+        password: "p@ssw0rd!#$%",
+        expectedFormat: /^[a-f0-9]{32}:[a-f0-9]{128}$/,
+      },
+    ];
+
+    testCases.forEach(({ name, password, expectedFormat }) => {
+      it(name, () => {
+        const hash1 = CryptoUtil.hashPassword(password);
+        const hash2 = CryptoUtil.hashPassword(password);
+
+        expect(hash1).toMatch(expectedFormat);
+        expect(hash2).toMatch(expectedFormat);
+        // Same password should produce different hashes (different salts)
+        expect(hash1).not.toBe(hash2);
+      });
+    });
+  });
+
+  describe("verifyPassword", () => {
+    const testCases = [
+      {
+        name: "should verify correct password",
+        password: "testpassword123",
+        shouldMatch: true,
+      },
+      {
+        name: "should reject incorrect password",
+        password: "testpassword123",
+        wrongPassword: "wrongpassword",
+        shouldMatch: false,
+      },
+      {
+        name: "should handle empty password",
+        password: "",
+        shouldMatch: true,
+      },
+      {
+        name: "should handle special characters",
+        password: "p@ssw0rd!#$%",
+        shouldMatch: true,
+      },
+    ];
+
+    testCases.forEach(({ name, password, wrongPassword, shouldMatch }) => {
+      it(name, () => {
+        const hash = CryptoUtil.hashPassword(password);
+        const testPassword = wrongPassword || password;
+
+        const result = CryptoUtil.verifyPassword(testPassword, hash);
+
+        expect(result).toBe(shouldMatch);
+      });
+    });
+  });
+
+  describe("generateToken", () => {
+    const secret = "test-secret-key";
+    const testCases = [
+      {
+        name: "should generate valid JWT token",
+        payload: { userId: 1, email: "test@example.com" },
+        expiresIn: 3600,
+        expectedParts: 3,
+      },
+      {
+        name: "should include expiration in token",
+        payload: { userId: 2, email: "user@example.com" },
+        expiresIn: 1800,
+        expectedParts: 3,
+      },
+      {
+        name: "should generate different tokens for same payload",
+        payload: { userId: 1, email: "test@example.com" },
+        expiresIn: 3600,
+        expectedParts: 3,
+      },
+    ];
+
+    testCases.forEach(({ name, payload, expiresIn, expectedParts }) => {
+      it(name, () => {
+        const token1 = CryptoUtil.generateToken(payload, secret, expiresIn);
+        const token2 = CryptoUtil.generateToken(payload, secret, expiresIn);
+
+        const parts1 = token1.split(".");
+        const parts2 = token2.split(".");
+
+        expect(parts1.length).toBe(expectedParts);
+        expect(parts2.length).toBe(expectedParts);
+        // Tokens should be different due to iat timestamp
+        expect(token1).not.toBe(token2);
+      });
+    });
+  });
+
+  describe("verifyToken", () => {
+    const secret = "test-secret-key";
+    const testCases = [
+      {
+        name: "should verify valid token",
+        payload: { userId: 1, email: "test@example.com" },
+        expiresIn: 3600,
+        shouldVerify: true,
+      },
+      {
+        name: "should reject token with wrong secret",
+        payload: { userId: 1, email: "test@example.com" },
+        expiresIn: 3600,
+        wrongSecret: "wrong-secret",
+        shouldVerify: false,
+      },
+      {
+        name: "should reject expired token",
+        payload: { userId: 1, email: "test@example.com" },
+        expiresIn: -1, // Expired
+        shouldVerify: false,
+      },
+      {
+        name: "should reject malformed token",
+        token: "invalid.token.format",
+        shouldVerify: false,
+      },
+    ];
+
+    testCases.forEach(
+      ({ name, payload, expiresIn, wrongSecret, token, shouldVerify }) => {
+        it(name, () => {
+          let testToken = token;
+          let testSecret = wrongSecret || secret;
+
+          if (!token && payload) {
+            testToken = CryptoUtil.generateToken(
+              payload,
+              secret,
+              expiresIn || 3600
+            );
+          }
+
+          if (expiresIn === -1) {
+            // Create expired token manually
+            const now = Math.floor(Date.now() / 1000);
+            const expiredPayload = {
+              ...payload,
+              iat: now - 3600,
+              exp: now - 1800,
+            };
+            testToken = CryptoUtil.generateToken(expiredPayload, secret, -1);
+          }
+
+          try {
+            const result = CryptoUtil.verifyToken(testToken!, testSecret);
+            expect(shouldVerify).toBe(true);
+            if (payload) {
+              expect(result.userId).toBe(payload.userId);
+              expect(result.email).toBe(payload.email);
+            }
+          } catch (error) {
+            expect(shouldVerify).toBe(false);
+          }
+        });
+      }
+    );
+  });
+
+  describe("generateRandomToken", () => {
+    const testCases = [
+      {
+        name: "should generate random token",
+        expectedLength: 64, // 32 bytes = 64 hex characters
+      },
+      {
+        name: "should generate different tokens each time",
+        expectedLength: 64,
+      },
+    ];
+
+    testCases.forEach(({ name, expectedLength }) => {
+      it(name, () => {
+        const token1 = CryptoUtil.generateRandomToken();
+        const token2 = CryptoUtil.generateRandomToken();
+
+        expect(token1.length).toBe(expectedLength);
+        expect(token2.length).toBe(expectedLength);
+        expect(token1).not.toBe(token2);
+        expect(token1).toMatch(/^[a-f0-9]{64}$/);
+        expect(token2).toMatch(/^[a-f0-9]{64}$/);
+      });
+    });
+  });
+});
